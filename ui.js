@@ -1,0 +1,30 @@
+// Interfejs
+let tab='yard',sel=null;
+const $=s=>document.querySelector(s);
+function toast(r){const t=$('#toast');t.textContent=r.msg;t.className='show'+(r.ok?'':' err');clearTimeout(toast.h);toast.h=setTimeout(()=>t.className='',2600)}
+function act(r){toast(r);render()}
+function barHtml(v){const c=v>66?'#3ecf8e':v>33?'#f5b638':'#ff5d5d';return`<div class="bar"><i style="width:${v}%;background:${c}"></i></div>`}
+function carSvg(c,w=150){return`<svg class="car" viewBox="0 0 60 110" width="${w*.5}" height="${w*.9}"><rect x="6" y="4" width="48" height="102" rx="14" fill="${c.color}" stroke="#0006" stroke-width="2"/><rect x="12" y="26" width="36" height="22" rx="5" fill="#9fd3ff" opacity=".8"/><rect x="12" y="58" width="36" height="26" rx="5" fill="#7fb4e0" opacity=".7"/><rect x="14" y="14" width="9" height="5" rx="2" fill="#fff3a0"/><rect x="37" y="14" width="9" height="5" rx="2" fill="#fff3a0"/><rect x="14" y="94" width="9" height="5" rx="2" fill="#d33"/><rect x="37" y="94" width="9" height="5" rx="2" fill="#d33"/></svg>`}
+function header(){$('#top').innerHTML=`<div class="stat"><small>Pieniądze</small>${pln(S.money)}</div><div class="stat"><small>Dzień</small>${S.day}</div><div class="stat"><small>Reputacja</small>${S.rep}/100</div><button class="pri" onclick="act(G.nextDay())">Następny dzień ▶</button>`}
+const TABS={yard:'🚗 Plac',office:'🏢 Biuro',market:'🛒 Rynek',garage:'🔧 Warsztat',store:'📦 Magazyn'};
+function nav(){$('#nav').innerHTML=Object.entries(TABS).map(([k,v])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';sel=null;render()">${v}</button>`).join('')}
+function carDetails(c){return`<div class="card"><b>${c.brand} ${c.model} ${c.year}</b> <span class="mut">${c.fuel}, ${c.hp} KM, ${c.km.toLocaleString('pl-PL')} km</span>
+ <div class="mut">Wartość rynkowa: ${pln(carValue(c))} • Stan techniczny ${carCond(c)}% • wizualny ${carVis(c)}%</div>
+ ${Object.entries(PARTS).map(([k,n])=>`<div class="row"><span>${n}</span><span>${Math.round(c.parts[k])}%</span></div>${barHtml(c.parts[k])}`).join('')}</div>`}
+function saleBox(c){return c.listed?`<div class="card">Wystawiony za <b>${pln(c.ask)}</b> • atrakcyjność oferty: <b>${G.attract(c)}%</b> (dni: ${c.daysOn})<br><br><button onclick="act(G.unlist(${c.id}))">Zdejmij z oferty</button></div>`:
+ `<div class="card"><div class="row"><span>Cena sprzedaży</span><span class="mut">sugerowana: ${pln(carValue(c))}</span></div><br><div class="row"><input id="pr" type="number" value="${Math.round(carValue(c)*1.1)}" oninput="prv()"><button class="pri" onclick="act(G.list(${c.id},$('#pr').value))">Wystaw</button><button onclick="if(confirm('Sprzedać handlarzowi za 70% wartości?'))act(G.sellNow(${c.id}))">Sprzedaj od razu</button></div><div id="att" class="mut" style="margin-top:8px"></div></div>`}
+function prv(){const c=S.cars.find(x=>x.id===sel);if(!c)return;const a=clamp(Math.round(100-($('#pr').value/carValue(c)-.8)*160));$('#att').textContent='Atrakcyjność przy tej cenie: '+a+'%'}
+const views={
+ yard(){let h='<div class="lot">';for(let i=0;i<S.slots;i++){const c=S.cars[i];h+=`<div class="slot">${c?`<div onclick="sel=${c.id};render()" style="text-align:center">${carSvg(c)}<div style="font-size:12px;color:#fff">${c.model} ${c.listed?'🏷️ '+pln(c.ask):''}</div></div>`:'wolne miejsce '+(i+1)}</div>`}
+  h+='</div>';const c=S.cars.find(x=>x.id===sel);return h+(c?'<br>'+carDetails(c)+saleBox(c):'<p class="mut">Kliknij samochód na placu, aby sprawdzić jego stan lub wystawić na sprzedaż.</p>')},
+ office(){return`<div class="card row"><div>Przychody<br><b class="pos">${pln(S.income)}</b></div><div>Wydatki<br><b class="neg">${pln(S.expense)}</b></div><div>Saldo<br><b>${pln(S.money)}</b></div></div>
+ <div class="card"><b>Historia transakcji</b>${S.tx.map(t=>`<div class="row mut"><span>Dz.${t.day} ${t.type}: ${t.label}</span><b class="${t.amt>=0?'pos':'neg'}">${t.amt>=0?'+':''}${pln(t.amt)}</b></div>`).join('')||'<p>Brak</p>'}</div>
+ <button onclick="if(confirm('Rozpocząć nową grę? Postęp zostanie utracony.')){newState();tab='yard';render()}">Nowa gra</button>`},
+ market(){return`<div class="grid">${S.market.map(c=>`<div class="card">${carSvg(c,90)}<b>${c.brand} ${c.model} ${c.year}</b><div class="mut">${c.fuel}, ${c.hp} KM, ${c.km.toLocaleString('pl-PL')} km</div>
+  <div class="mut">Technika ${carCond(c)}% • wygląd ${carVis(c)}%</div><div class="row"><b>${pln(c.price)}</b><button class="pri" onclick="act(G.buy(${c.id}))">Kup</button></div><button style="width:100%;margin-top:6px" onclick="sel=${c.id};this.parentNode.insertAdjacentHTML('beforeend','<div style=margin-top:8px>${Object.entries(PARTS).map(([k,n])=>n+': '+Math.round(c.parts[k])+'%').join(' • ')}</div>');this.remove()">Sprawdź stan</button></div>`).join('')}</div><p class="mut">Oferty odświeżają się co 3 dni. Wolne miejsca: ${S.slots-S.cars.length}/${S.slots}</p>`},
+ garage(){const busy=S.repairs.length;return`<div class="card">Stanowiska: ${busy}/${S.bays} zajęte. Naprawa trwa 1 dzień i poprawia część o do ${CFG.repairPts} pkt.</div>`+(S.cars.length?S.cars.map(c=>`<div class="card"><b>${c.brand} ${c.model}</b>${Object.keys(REPAIRS).map(k=>{const r=G.repairCost(c,k);return`<div class="row"><span>${PARTS[k]} ${Math.round(c.parts[k])}%</span><button ${r.pts<=0?'disabled':''} onclick="act(G.repair(${c.id},'${k}'))">${r.pts>0?'Napraw +'+r.pts+' • '+pln(r.cost):'Sprawne'}</button></div>${barHtml(c.parts[k])}`}).join('')}</div>`).join(''):'<p class="mut">Brak aut do naprawy.</p>')},
+ store(){return`<div class="card"><b>Magazyn pojazdów</b><br><span class="mut">Zajęte miejsca: ${S.cars.length}/${S.slots}</span></div>`+S.cars.map(c=>`<div class="card row" onclick="tab='yard';sel=${c.id};render()" style="cursor:pointer"><span>${c.brand} ${c.model} ${c.year}</span><span>${pln(carValue(c))}${c.listed?' 🏷️':''}</span></div>`).join('')}
+};
+function render(){header();nav();$('#view').innerHTML=views[tab]()}
+if(!load())newState();render();
+addEventListener('beforeunload',save);document.addEventListener('visibilitychange',save);
